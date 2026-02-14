@@ -42,77 +42,37 @@ export default function PromptCard({ prompt, onCategoryClick, activeCategory }: 
 
   return (
     <>
-      <Link href={`/${prompt.id}`} className="group block">
-        <article className="relative bg-white rounded-xl border border-gray-200/80 p-5 transition-all duration-200 hover:shadow-md hover:border-gray-300 hover:-translate-y-0.5">
-          {/* ID badge */}
-          <span className="inline-block text-xs font-mono text-gray-400 mb-2">
-            {formatId(prompt.id)}
-          </span>
+      <Link href={`/${prompt.id}`} className="group block h-full">
+        <article className="neo-card rounded-2xl p-5 cursor-pointer group flex flex-col h-full bg-white transition-all duration-300">
 
-          {/* Title */}
-          <h2 className="text-base font-semibold text-gray-900 leading-snug mb-2 group-hover:text-blue-600 transition-colors line-clamp-2">
-            {cleanTitle(prompt.title)}
-          </h2>
-
-          {/* Category tags */}
-          {prompt.categories && prompt.categories.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {prompt.categories.map((cat) => {
-                const colors = getCategoryColor(cat);
-                const isActive = activeCategory === cat;
-                return (
-                  <button
-                    key={cat}
-                    onClick={(e) => handleCategoryClick(e, cat)}
-                    className={`px-1.5 py-0.5 text-[10px] font-medium rounded-md transition-all ${colors.bg} ${colors.text} ${colors.hover} ${
-                      isActive ? "ring-1 ring-current/30" : ""
-                    }`}
-                  >
-                    {cat.replace("#", "")}
-                  </button>
-                );
-              })}
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex flex-wrap gap-1.5">
+              {prompt.categories && prompt.categories.slice(0, 3).map((cat) => (
+                <span key={cat} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">
+                  {cat.replace("#", "")}
+                </span>
+              ))}
             </div>
-          )}
+            <span className="text-[10px] font-mono text-slate-300 group-hover:text-brand-400 transition-colors">
+              #{prompt.id}
+            </span>
+          </div>
 
-          {/* Body preview */}
-          <p className="text-sm text-gray-500 leading-relaxed mb-4 line-clamp-3">
+          <h3 className="text-base font-bold text-slate-800 mb-2 leading-snug group-hover:text-brand-600 transition-colors line-clamp-2">
+            {cleanTitle(prompt.title)}
+          </h3>
+
+          <p className="text-xs text-slate-500 leading-relaxed line-clamp-4 font-mono mb-4 flex-grow">
             {truncate(prompt.body.replace(/[\n\r]+/g, " "), 120)}
           </p>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopy}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="プロンプトをコピー"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              コピー
-            </button>
-
-            <button
-              onClick={handleOpenAI}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-              aria-label="ChatGPTで開く"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              ChatGPT
-            </button>
-
-            <button
-              onClick={handleOpenGemini}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
-              aria-label="Geminiで開く"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Gemini
-            </button>
-
-            <span className="ml-auto text-gray-300 group-hover:text-blue-400 transition-colors">
-              <ArrowRight className="w-4 h-4" />
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+            <span className="flex items-center gap-1 group-hover:text-brand-500 transition-colors">
+              View details
             </span>
+            <ArrowRight className="w-3 h-3 -ml-2 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
           </div>
+
         </article>
       </Link>
 
@@ -124,3 +84,4 @@ export default function PromptCard({ prompt, onCategoryClick, activeCategory }: 
     </>
   );
 }
+
