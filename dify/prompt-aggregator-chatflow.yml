@@ -1,0 +1,599 @@
+########################################################################
+# Prompt Aggregator - Dify Chatflow DSL Template
+#
+# このファイルは Dify の Chatflow アプリケーション構成テンプレートです。
+# Dify にインポートして使用するか、手動構築時の参照として使用してください。
+#
+# 注意:
+# - dataset_ids は Dify 上で Knowledge Base 作成後に実際の ID に置き換えてください
+# - model の provider/name は利用環境に合わせて変更してください
+# - <<KNOWLEDGE_BASE_ID>> を実際の ID に置き換えてください
+########################################################################
+
+app:
+  description: 'AIプロンプト集（814件）を自然言語で検索・閲覧できるアシスタント'
+  icon: "\U0001F50D"
+  icon_background: '#E8F0FE'
+  mode: advanced-chat
+  name: プロンプト検索アシスタント
+
+kind: app
+version: 0.1.2
+
+workflow:
+  features:
+    file_upload:
+      image:
+        enabled: false
+    opening_statement: |
+      プロンプト検索アシスタントへようこそ！
+      814件のAIプロンプトから、あなたに最適なプロンプトをお探しします。
+
+      使い方:
+      ・やりたいことを入力 →「メール文面を作りたい」
+      ・カテゴリで探す →「プログラミング系を見せて」
+      ・ID指定 →「#001の詳細を見せて」
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+      - '文章を要約するプロンプトを探して'
+      - 'プログラミング系のプロンプト一覧'
+      - '業務改善に使えるプロンプトは？'
+    suggested_questions_after_answer:
+      enabled: true
+    text_to_speech:
+      enabled: false
+
+  graph:
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.8
+
+    #------------------------------------------------------------------
+    # ノード定義
+    #------------------------------------------------------------------
+    nodes:
+      # ============================================================
+      # Start ノード
+      # ============================================================
+      - id: 'start_001'
+        type: custom
+        data:
+          type: start
+          title: Start
+          desc: 'ユーザー入力受付'
+          variables: []
+        position:
+          x: 30
+          y: 300
+        width: 244
+        height: 54
+
+      # ============================================================
+      # Question Classifier - ユーザー意図の4分類
+      # ============================================================
+      - id: 'classifier_001'
+        type: custom
+        data:
+          type: question-classifier
+          title: 意図分類
+          desc: 'ユーザーの入力を4つの意図に分類する'
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.1
+          instruction: |
+            ユーザーの入力を以下の4つに分類してください:
+            - 検索: プロンプトを探す意図（「〜したい」「〜のプロンプト」「探して」「ある？」等）
+            - ID指定: 特定IDのプロンプト詳細を見たい（「#001」「001番」「〜の詳細」等）
+            - カテゴリ: カテゴリ別一覧を見たい（「〜系」「〜カテゴリ」「一覧」等）
+            - その他: 挨拶、ヘルプ、使い方の質問
+          query_variable_selector:
+            - 'start_001'
+            - 'sys.query'
+          classes:
+            - id: 'class_search'
+              name: 検索
+            - id: 'class_detail'
+              name: ID指定
+            - id: 'class_category'
+              name: カテゴリ
+            - id: 'class_other'
+              name: その他
+        position:
+          x: 350
+          y: 200
+        width: 244
+        height: 268
+
+      # ============================================================
+      # Knowledge Retrieval - 検索フロー (Top-K=5)
+      # ============================================================
+      - id: 'kb_search_001'
+        type: custom
+        data:
+          type: knowledge-retrieval
+          title: プロンプト検索
+          desc: 'セマンティック検索で関連プロンプトを取得（最大5件）'
+          retrieval_mode: multiple
+          multiple_retrieval_config:
+            top_k: 5
+            score_threshold: 0.5
+            reranking_enable: true
+          dataset_ids:
+            - '<<KNOWLEDGE_BASE_ID>>'
+          query_variable_selector:
+            - 'start_001'
+            - 'sys.query'
+        position:
+          x: 700
+          y: 80
+        width: 244
+        height: 92
+
+      # ============================================================
+      # Knowledge Retrieval - ID指定フロー (Top-K=1)
+      # ============================================================
+      - id: 'kb_detail_001'
+        type: custom
+        data:
+          type: knowledge-retrieval
+          title: プロンプト詳細取得
+          desc: 'ID指定でプロンプト全文を取得'
+          retrieval_mode: multiple
+          multiple_retrieval_config:
+            top_k: 1
+            score_threshold: 0.3
+            reranking_enable: true
+          dataset_ids:
+            - '<<KNOWLEDGE_BASE_ID>>'
+          query_variable_selector:
+            - 'start_001'
+            - 'sys.query'
+        position:
+          x: 700
+          y: 230
+        width: 244
+        height: 92
+
+      # ============================================================
+      # Knowledge Retrieval - カテゴリフロー (Top-K=10)
+      # ============================================================
+      - id: 'kb_category_001'
+        type: custom
+        data:
+          type: knowledge-retrieval
+          title: カテゴリ検索
+          desc: 'カテゴリ指定で該当プロンプトを取得（最大10件）'
+          retrieval_mode: multiple
+          multiple_retrieval_config:
+            top_k: 10
+            score_threshold: 0.3
+            reranking_enable: false
+          dataset_ids:
+            - '<<KNOWLEDGE_BASE_ID>>'
+          query_variable_selector:
+            - 'start_001'
+            - 'sys.query'
+        position:
+          x: 700
+          y: 380
+        width: 244
+        height: 92
+
+      # ============================================================
+      # LLM - 検索結果整形
+      # ============================================================
+      - id: 'llm_search_001'
+        type: custom
+        data:
+          type: llm
+          title: 検索結果を整形
+          desc: '検索結果を見やすいカード形式で表示'
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.3
+              max_tokens: 2000
+          prompt_template:
+            - role: system
+              text: |
+                あなたは「プロンプト検索アシスタント」です。
+                ユーザーの質問に対して、Knowledge Baseの検索結果から最適なプロンプトを推薦してください。
+
+                ## 応答ルール
+                1. 検索結果から関連度の高い順に最大5件を表示すること
+                2. 検索結果に含まれないプロンプトを捏造しないこと（ハルシネーション禁止）
+                3. 該当がない場合は正直に伝え、別のキーワードを提案すること
+                4. 日本語で応答すること
+
+                ## 各プロンプトの表示形式
+                **#{ID} {タイトル}**
+                カテゴリ: {カテゴリ}
+                > {本文の冒頭150文字}...
+                - [ChatGPTで使う](https://chatgpt.com/?q={プロンプト本文の冒頭500文字をURLエンコード})
+                - [Geminiで使う](https://gemini.google.com/app?q={プロンプト本文の冒頭500文字をURLエンコード})
+
+                ## 補足
+                - 5件未満しかヒットしない場合はヒットした分だけ表示
+                - 最後に「詳細を見たい場合は『#IDの詳細を見せて』と入力してください」と案内
+            - role: user
+              text: '{{#sys.query#}}'
+          context:
+            enabled: true
+            variable_selector:
+              - 'kb_search_001'
+              - output
+          memory:
+            role_prefix:
+              assistant: ''
+              user: ''
+            window:
+              enabled: true
+              size: 5
+          vision:
+            enabled: false
+        position:
+          x: 1050
+          y: 80
+        width: 244
+        height: 98
+
+      # ============================================================
+      # LLM - 詳細表示
+      # ============================================================
+      - id: 'llm_detail_001'
+        type: custom
+        data:
+          type: llm
+          title: プロンプト全文表示
+          desc: '指定IDのプロンプト全文をコードブロックで表示'
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              max_tokens: 3000
+          prompt_template:
+            - role: system
+              text: |
+                あなたは「プロンプト検索アシスタント」です。
+                ユーザーが指定したプロンプトの全文を表示してください。
+
+                ## 応答ルール
+                1. 検索結果からユーザーが指定したプロンプトを特定すること
+                2. プロンプト全文をコードブロック内に表示（コピーしやすいように）
+                3. 検索結果に該当がない場合は「該当するプロンプトが見つかりませんでした」と回答
+                4. 存在しないプロンプトを捏造しないこと
+                5. 日本語で応答すること
+
+                ## 表示形式
+                **#{ID} {タイトル}**
+                カテゴリ: {カテゴリ}
+                元ページ: {URL}
+
+                ```
+                {プロンプト本文の全文}
+                ```
+
+                このプロンプトを使う:
+                - [ChatGPTで開く](https://chatgpt.com/?q={プロンプト本文をURLエンコード})
+                - [Geminiで開く](https://gemini.google.com/app?q={プロンプト本文をURLエンコード})
+            - role: user
+              text: '{{#sys.query#}}'
+          context:
+            enabled: true
+            variable_selector:
+              - 'kb_detail_001'
+              - output
+          memory:
+            role_prefix:
+              assistant: ''
+              user: ''
+            window:
+              enabled: true
+              size: 5
+          vision:
+            enabled: false
+        position:
+          x: 1050
+          y: 230
+        width: 244
+        height: 98
+
+      # ============================================================
+      # LLM - カテゴリ一覧
+      # ============================================================
+      - id: 'llm_category_001'
+        type: custom
+        data:
+          type: llm
+          title: カテゴリ一覧表示
+          desc: '指定カテゴリのプロンプト一覧を表形式で表示'
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.3
+              max_tokens: 2000
+          prompt_template:
+            - role: system
+              text: |
+                あなたは「プロンプト検索アシスタント」です。
+                指定されたカテゴリに該当するプロンプトの一覧を表示してください。
+
+                ## 8カテゴリ
+                1. #文章作成・要約  2. #文書校正・編集  3. #アイデア創出・企画  4. #業務改善
+                5. #情報収集・分析  6. #コミュニケーション支援  7. #プログラミング  8. #意識改革・スキルアップ
+
+                ## 応答ルール
+                1. ユーザーの入力から該当カテゴリを判定
+                2. 検索結果から該当カテゴリのプロンプトをリスト表示
+                3. 各項目に ID とタイトルを含める
+                4. 検索結果にないプロンプトを捏造しないこと
+                5. 日本語で応答
+
+                ## 表示形式
+                **{カテゴリ名}** のプロンプト一覧:
+                | # | ID | タイトル |
+                |---|-----|---------|
+                | 1 | #001 | {タイトル} |
+
+                最後に「詳細を見たい場合は『#IDの詳細を見せて』と入力してください」と案内。
+                カテゴリが特定できない場合は8カテゴリの一覧を表示して選んでもらう。
+            - role: user
+              text: '{{#sys.query#}}'
+          context:
+            enabled: true
+            variable_selector:
+              - 'kb_category_001'
+              - output
+          memory:
+            role_prefix:
+              assistant: ''
+              user: ''
+            window:
+              enabled: true
+              size: 5
+          vision:
+            enabled: false
+        position:
+          x: 1050
+          y: 380
+        width: 244
+        height: 98
+
+      # ============================================================
+      # LLM - ガイド応答（挨拶・ヘルプ）
+      # ============================================================
+      - id: 'llm_guide_001'
+        type: custom
+        data:
+          type: llm
+          title: ガイド応答
+          desc: '挨拶やヘルプリクエストに応答'
+          model:
+            provider: openai
+            name: gpt-4o-mini
+            mode: chat
+            completion_params:
+              temperature: 0.5
+              max_tokens: 1000
+          prompt_template:
+            - role: system
+              text: |
+                あなたは「プロンプト検索アシスタント」です。
+                AIプロンプト集（814件、8カテゴリ）を検索できるサービスの案内役です。
+
+                ## できること
+                1. プロンプト検索: やりたいことを伝えると最適なプロンプトを提案
+                   例:「議事録を要約したい」「メール文面を作成したい」
+                2. カテゴリ別閲覧: カテゴリ指定で一覧表示
+                   例:「プログラミング系を見せて」
+                3. 詳細表示: ID指定でプロンプト全文を表示
+                   例:「#001の詳細を見せて」
+                4. AI連携: ChatGPTやGeminiで直接開くリンクを提供
+
+                ## 8カテゴリ
+                #文章作成・要約 / #文書校正・編集 / #アイデア創出・企画 / #業務改善
+                #情報収集・分析 / #コミュニケーション支援 / #プログラミング / #意識改革・スキルアップ
+
+                ## 応答ルール
+                - フレンドリーかつ簡潔な日本語で応答
+                - 挨拶には挨拶で返し、使い方を簡潔に案内
+                - プロンプトに関係ない質問には丁寧にプロンプト検索への案内を行う
+            - role: user
+              text: '{{#sys.query#}}'
+          context:
+            enabled: false
+          memory:
+            role_prefix:
+              assistant: ''
+              user: ''
+            window:
+              enabled: true
+              size: 5
+          vision:
+            enabled: false
+        position:
+          x: 1050
+          y: 530
+        width: 244
+        height: 98
+
+      # ============================================================
+      # Answer ノード（4個）- Chatflow では End の代わりに Answer を使用
+      # ============================================================
+      - id: 'answer_search'
+        type: custom
+        data:
+          type: answer
+          title: 検索結果を返答
+          desc: ''
+          answer: '{{#llm_search_001.text#}}'
+        position:
+          x: 1400
+          y: 80
+        width: 244
+        height: 54
+
+      - id: 'answer_detail'
+        type: custom
+        data:
+          type: answer
+          title: 詳細を返答
+          desc: ''
+          answer: '{{#llm_detail_001.text#}}'
+        position:
+          x: 1400
+          y: 230
+        width: 244
+        height: 54
+
+      - id: 'answer_category'
+        type: custom
+        data:
+          type: answer
+          title: カテゴリ一覧を返答
+          desc: ''
+          answer: '{{#llm_category_001.text#}}'
+        position:
+          x: 1400
+          y: 380
+        width: 244
+        height: 54
+
+      - id: 'answer_guide'
+        type: custom
+        data:
+          type: answer
+          title: ガイドを返答
+          desc: ''
+          answer: '{{#llm_guide_001.text#}}'
+        position:
+          x: 1400
+          y: 530
+        width: 244
+        height: 54
+
+    #------------------------------------------------------------------
+    # エッジ定義（ノード間の接続）
+    #------------------------------------------------------------------
+    edges:
+      # Start → Question Classifier
+      - id: 'edge_start_to_classifier'
+        source: 'start_001'
+        target: 'classifier_001'
+        type: custom
+        data:
+          sourceType: start
+          targetType: question-classifier
+
+      # Question Classifier → 各 Knowledge Retrieval (条件分岐)
+      - id: 'edge_classifier_to_search'
+        source: 'classifier_001'
+        sourceHandle: 'class_search'
+        target: 'kb_search_001'
+        type: custom
+        data:
+          sourceType: question-classifier
+          targetType: knowledge-retrieval
+
+      - id: 'edge_classifier_to_detail'
+        source: 'classifier_001'
+        sourceHandle: 'class_detail'
+        target: 'kb_detail_001'
+        type: custom
+        data:
+          sourceType: question-classifier
+          targetType: knowledge-retrieval
+
+      - id: 'edge_classifier_to_category'
+        source: 'classifier_001'
+        sourceHandle: 'class_category'
+        target: 'kb_category_001'
+        type: custom
+        data:
+          sourceType: question-classifier
+          targetType: knowledge-retrieval
+
+      - id: 'edge_classifier_to_guide'
+        source: 'classifier_001'
+        sourceHandle: 'class_other'
+        target: 'llm_guide_001'
+        type: custom
+        data:
+          sourceType: question-classifier
+          targetType: llm
+
+      # Knowledge Retrieval → LLM
+      - id: 'edge_kb_search_to_llm'
+        source: 'kb_search_001'
+        target: 'llm_search_001'
+        type: custom
+        data:
+          sourceType: knowledge-retrieval
+          targetType: llm
+
+      - id: 'edge_kb_detail_to_llm'
+        source: 'kb_detail_001'
+        target: 'llm_detail_001'
+        type: custom
+        data:
+          sourceType: knowledge-retrieval
+          targetType: llm
+
+      - id: 'edge_kb_category_to_llm'
+        source: 'kb_category_001'
+        target: 'llm_category_001'
+        type: custom
+        data:
+          sourceType: knowledge-retrieval
+          targetType: llm
+
+      # LLM → Answer
+      - id: 'edge_llm_search_to_answer'
+        source: 'llm_search_001'
+        target: 'answer_search'
+        type: custom
+        data:
+          sourceType: llm
+          targetType: answer
+
+      - id: 'edge_llm_detail_to_answer'
+        source: 'llm_detail_001'
+        target: 'answer_detail'
+        type: custom
+        data:
+          sourceType: llm
+          targetType: answer
+
+      - id: 'edge_llm_category_to_answer'
+        source: 'llm_category_001'
+        target: 'answer_category'
+        type: custom
+        data:
+          sourceType: llm
+          targetType: answer
+
+      - id: 'edge_llm_guide_to_answer'
+        source: 'llm_guide_001'
+        target: 'answer_guide'
+        type: custom
+        data:
+          sourceType: llm
+          targetType: answer
+
+  environment_variables: []
+  conversation_variables: []
